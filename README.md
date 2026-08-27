@@ -5,7 +5,7 @@ built to demonstrate production-oriented GenAI/LLM engineering: document
 ingestion, structure-aware chunking, vector retrieval, grounded generation,
 prompt-injection safeguards, and a retrieval evaluation harness.
 
-**Why this domain:** "At Tenaris, a few times a year, a product would come in with a specific defect or minor damage, and figuring out whether it was acceptable for a given field application meant manually searching through long technical procedures and regulations — often product by product. That kind of problem — an infrequent but real question that requires digging through lengthy documents to answer correctly — is exactly what retrieval-augmented generation is built for. This project applies that same pattern to a different domain, OSHA safety regulations, to build hands-on RAG/LLM experience for the AI Engineer roles I'm now targeting.."
+**Why this domain:** "At Tenaris, a few times a year, a product would come in with a specific defect or minor damage, and figuring out whether it was acceptable for a given field application meant manually searching through long technical procedures and regulations — often product by product. That kind of problem — an infrequent but real question that requires digging through lengthy documents to answer correctly — is exactly what retrieval-augmented generation is built for. This project applies that same pattern to a different domain, OSHA safety regulations, to build hands-on RAG/LLM experience for the AI Engineer roles I'm now targeting."
 
 ## Stack
 
@@ -43,9 +43,9 @@ osha-rag-assistant/
 - [x] **Ingestion** — pulls OSHA 29 CFR 1910 from the eCFR API, parses it into
       204 structured sections (section id, title, subpart, text). Verified
       working locally.
-- [ ] Chunking
-- [ ] Vector store + embeddings
-- [ ] RAG chain (retrieval + generation + prompt-injection safeguards)
+- [x] Chunking
+- [x] Vector store + embeddings
+- [x] RAG chain (retrieval + generation + prompt-injection safeguards)
 - [ ] FastAPI endpoint
 - [ ] Evaluation harness
 - [ ] Docker
@@ -66,10 +66,20 @@ cp .env.example .env
 
 # 4. Ingest the source documents (downloads 29 CFR 1910 from eCFR)
 python -m src.ingest
+
+# 5. Build the vector store (embeds all chunks — costs roughly $0.02-0.05
+#    with text-embedding-3-small)
+python -m src.embed_store
+
+# 6. Ask a question directly (no API yet — see Progress above)
+python -c "
+from src.rag_chain import answer_question
+result = answer_question('What are the requirements for eye protection?')
+print(result['answer'])
 ```
 
-Steps 5 onward (embedding, running the API, evaluation, Docker) will be added
-here as those pieces are built and verified.
+Step 7 onward (running the API, evaluation, Docker) will be added here as
+those pieces are built and verified.
 
 ## Known gaps / honest next steps
 
@@ -77,5 +87,12 @@ here as those pieces are built and verified.
   real run (204 sections parsed) — but if `parse_sections()` ever returns 0
   results after an eCFR schema change, inspect `data/raw/1910_raw.xml` and
   adjust the tag names.
-- Everything past ingestion is unbuilt as of this commit.
+- The AI's generated answer doesn't always explicitly cite every section it
+  retrieved — the `sources` field in the response is the reliable source of
+  truth (pulled directly from retrieved document metadata), not the AI's
+  inline prose citations.
+- No FastAPI endpoint yet — currently only callable via a direct Python
+  function call (`answer_question()`), not over HTTP.
+- No evaluation harness run yet — retrieval quality has only been spot-
+  checked manually with a handful of test questions.
 

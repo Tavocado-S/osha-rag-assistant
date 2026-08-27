@@ -1,7 +1,7 @@
 """
 Step 3: the actual RAG chain — retrieve -> build prompt -> generate.
 
-Prompt-injection safeguards (this is the reeeliance-relevant part):
+Prompt-injection safeguards:
 
 Two distinct threats matter for a RAG app, and they need different defenses:
 
