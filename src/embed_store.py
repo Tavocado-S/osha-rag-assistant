@@ -1,5 +1,5 @@
 """
-Step 2: embed the chunks from chunking.py and persist them in a local
+Embed the chunks from chunking.py and persist them in a local
 Chroma vector store. Run once after ingest.py; the API just loads the
 persisted store afterwards (no re-embedding on every request).
 
