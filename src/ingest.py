@@ -61,7 +61,7 @@ def parse_sections(xml_text: str) -> list[dict]:
     for node in soup.find_all(["DIV6", "DIV8"]):  # DIV6=subpart, DIV8=section
         if node.name == "DIV6":
             head = node.find("HEAD")
-            current_subpart = head.get_text(strip=True) if head else current_subpart
+            current_subpart = head.get_text(strip=True) if head else node.get("N", "unknown")
             continue
 
         head = node.find("HEAD")
