@@ -28,10 +28,8 @@ Two distinct threats matter for a RAG app, and they need different defenses:
    context doesn't cover the question, which limits the blast radius
    even if (1) or (2) partially succeed.
 
-None of this is bulletproof — that's worth saying out loud in an
-interview rather than overclaiming. It's defense-in-depth, not a solved
-problem.
 """
+
 import re
 
 from langchain_openai import ChatOpenAI
