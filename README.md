@@ -14,7 +14,7 @@ prompt-injection safeguards, and a retrieval evaluation harness.
 - **OpenAI embeddings + chat model** — swappable via `.env` for an
   open-source stack later (e.g. `sentence-transformers` + a local LLM)
 - **FastAPI** — thin API over a pipeline module
-- **Docker** — containerized for deployment parity with the other projects
+- **Docker** — containerization planned, matching the deployment pattern of my other projects
 
 ## Project structure
 
@@ -43,11 +43,17 @@ osha-rag-assistant/
 - [x] **Ingestion** — pulls OSHA 29 CFR 1910 from the eCFR API, parses it into
       204 structured sections (section id, title, subpart, text). Verified
       working locally.
-- [x] Chunking
-- [x] Vector store + embeddings
-- [x] RAG chain (retrieval + generation + prompt-injection safeguards)
-- [ ] FastAPI endpoint
-- [ ] Evaluation harness
+- [x] **Chunking** — structure-aware splitting (one section = one chunk by
+      default), token-based sizing. 2,733 chunks from 204 sections.
+- [x] **Vector store + embeddings** — all chunks embedded with
+      text-embedding-3-small, persisted to a local Chroma store.
+- [x] **RAG chain** — retrieval + grounded generation + prompt-injection
+      safeguards, verified against normal, out-of-scope, and injection-
+      attempt queries.
+- [x] **FastAPI endpoint** — `/health` and `/query`, tested live via the
+      auto-generated Swagger UI.
+- [x] **Evaluation harness** — retrieval hit-rate measured on a 20-question
+      set spanning 13 subparts: 100%. See Evaluation section below.
 - [ ] Docker
 
 ## Setup (local, step by step)
@@ -71,15 +77,36 @@ python -m src.ingest
 #    with text-embedding-3-small)
 python -m src.embed_store
 
-# 6. Ask a question directly (no API yet — see Progress above)
-python -c "
-from src.rag_chain import answer_question
-result = answer_question('What are the requirements for eye protection?')
-print(result['answer'])
+# 6. Run the API
+uvicorn src.api:app --reload
+
+# 7. Test it (in a separate terminal, or via http://localhost:8000/docs)
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What are the machine guarding requirements?"}'
+
+# 8. Run the evaluation harness
+python -m eval.run_eval
 ```
 
-Step 7 onward (running the API, evaluation, Docker) will be added here as
-those pieces are built and verified.
+Docker setup will be added here once containerization is complete.
+
+## Evaluation
+
+Retrieval quality was measured with `eval/run_eval.py` against a 20-question
+test set (`eval/eval_qa.json`) spanning 13 different OSHA subparts — not
+just the topics covered during development, to avoid testing only on
+"easy" cases.
+
+**Retrieval hit-rate: 100% (20/20)** — the correct section appeared in the
+top-4 retrieved chunks for every question. One initial miss (95%, 19/20)
+was traced to an imprecise expected-section label in the test set itself
+(confirmed by checking the real section titles in the data), not a
+retrieval failure — corrected after verification.
+
+A separate manual spot-check runs full generation (not just retrieval) on
+a subset of 3 questions, to review answer quality and citation behavior
+without the added API cost of generating all 20.
 
 ## Known gaps / honest next steps
 
@@ -91,8 +118,11 @@ those pieces are built and verified.
   retrieved — the `sources` field in the response is the reliable source of
   truth (pulled directly from retrieved document metadata), not the AI's
   inline prose citations.
-- No FastAPI endpoint yet — currently only callable via a direct Python
-  function call (`answer_question()`), not over HTTP.
-- No evaluation harness run yet — retrieval quality has only been spot-
-  checked manually with a handful of test questions.
+- The eval set (20 questions) is still a relatively small sample for
+  statistical confidence — expanding further would strengthen the
+  retrieval hit-rate as evidence.
+- The manual answer spot-check only reviews full generation on 3 of the
+  20 questions (API cost trade-off) — a more rigorous setup would use an
+  automated faithfulness check (e.g. LLM-as-judge) across the full set.
+- No Docker deployment yet.
 
