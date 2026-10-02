@@ -1,0 +1,82 @@
+[
+  {
+    "question": "What must be provided on machines with rotating parts to protect operators?",
+    "expected_section": "1910.212"
+  },
+  {
+    "question": "What is required for the storage of flammable liquids?",
+    "expected_section": "1910.106"
+  },
+  {
+    "question": "What are the general requirements for exit routes in a workplace?",
+    "expected_section": "1910.36"
+  },
+  {
+    "question": "What does OSHA say about employer responsibility for providing personal protective equipment?",
+    "expected_section": "1910.132"
+  },
+  {
+    "question": "What is the OSHA standard number for hazard communication?",
+    "expected_section": "1910.1200"
+  },
+  {
+    "question": "What are the requirements for controlling hazardous energy during equipment servicing, such as lockout and tagout procedures?",
+    "expected_section": "1910.147"
+  },
+  {
+    "question": "What permit requirements apply before an employee enters a confined space?",
+    "expected_section": "1910.146"
+  },
+  {
+    "question": "What protections does OSHA require against occupational noise exposure?",
+    "expected_section": "1910.95"
+  },
+  {
+    "question": "When must an employer provide respiratory protection to employees?",
+    "expected_section": "1910.134"
+  },
+  {
+    "question": "What precautions must employers take to protect employees from bloodborne pathogens?",
+    "expected_section": "1910.1030"
+  },
+  {
+    "question": "What are the general requirements for portable fire extinguishers in the workplace?",
+    "expected_section": "1910.157"
+  },
+  {
+    "question": "What training and inspection requirements apply to powered industrial trucks like forklifts?",
+    "expected_section": "1910.178"
+  },
+  {
+    "question": "What are the general electrical safety requirements for the workplace?",
+    "expected_section": "1910.301"
+  },
+  {
+    "question": "What requirements apply to the use of portable ladders?",
+    "expected_section": "1910.23"
+  },
+  {
+    "question": "When is fall protection required for employees working at height?",
+    "expected_section": "1910.28"
+  },
+  {
+    "question": "What are the general requirements for welding, cutting, and brazing operations?",
+    "expected_section": "1910.252"
+  },
+  {
+    "question": "What are the requirements for guarding mechanical power-transmission apparatus like belts and pulleys?",
+    "expected_section": "1910.219"
+  },
+  {
+    "question": "What medical services and first aid must be available in the workplace?",
+    "expected_section": "1910.151"
+  },
+  {
+    "question": "What are the permissible exposure limits for air contaminants in the workplace?",
+    "expected_section": "1910.1000"
+  },
+  {
+    "question": "What are the general requirements for hand and portable powered tools?",
+    "expected_section": "1910.242"
+  }
+]
