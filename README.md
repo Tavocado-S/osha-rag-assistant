@@ -1,20 +1,46 @@
 # OSHA RAG Assistant
 
-A RAG-based Q&A assistant over OSHA General Industry Standards (29 CFR 1910),
-built to demonstrate production-oriented GenAI/LLM engineering: document
-ingestion, structure-aware chunking, vector retrieval, grounded generation,
-prompt-injection safeguards, and a retrieval evaluation harness.
+A RAG-based Q&A assistant over OSHA General Industry Standards (29 CFR 1910).
+Ask a question in plain language and get an answer grounded in the regulation
+text, with the cited sections returned alongside it.
 
-**Why this domain:** "At Tenaris, a few times a year, a product would come in with a specific defect or minor damage, and figuring out whether it was acceptable for a given field application meant manually searching through long technical procedures and regulations — often product by product. That kind of problem — an infrequent but real question that requires digging through lengthy documents to answer correctly — is exactly what retrieval-augmented generation is built for. This project applies that same pattern to a different domain, OSHA safety regulations, to build hands-on RAG/LLM experience for the AI Engineer roles I'm now targeting."
+Built to demonstrate production-oriented GenAI/LLM engineering: document
+ingestion, structure-aware chunking, vector retrieval, grounded generation,
+prompt-injection safeguards, a retrieval evaluation, an API, and a Docker
+deployment.
+
+# Why this Project?
+
+At Tenaris, a few times a year, a product would come in with a specific defect or minor damage, and figuring out whether it was acceptable for a given field application meant manually searching through long technical procedures and regulations — often product by product. That kind of problem — an infrequent but real question that requires digging through lengthy documents to answer correctly — is exactly what retrieval-augmented generation is built for. This project applies that same pattern to a different domain, OSHA safety regulations, to build hands-on RAG/LLM experience for the AI Engineer roles I'm now targeting.
 
 ## Stack
 
+- **Python 3.11**
 - **LangChain** — orchestration (retrieval + prompt chaining)
 - **Chroma** — local vector store, persisted to disk
 - **OpenAI embeddings + chat model** — swappable via `.env` for an
   open-source stack later (e.g. `sentence-transformers` + a local LLM)
 - **FastAPI** — thin API over a pipeline module
 - **Docker** — containerization planned, matching the deployment pattern of my other projects
+- **pytest**: API integration tests
+
+## How it works
+
+1. **Ingest** (`src/ingest.py`): downloads 29 CFR 1910 from the official eCFR API (XML) and parses it into 204 sections with section id, title, subpart and text.
+2. **Chunk** (`src/chunking.py`): one section = one chunk by default. Sections over 500 tokens are split with a token-based splitter (50-token overlap). Result: 2,733 chunks, each keeping its section metadata.
+3. **Embed and store** (`src/embed_store.py`): embeds the chunks and persists them in a local Chroma store.
+4. **Answer** (`src/rag_chain.py`): embeds the question, retrieves the top 4 chunks, and generates an answer from that context only (`temperature=0`).
+5. **Serve** (`src/api.py`): FastAPI endpoints `GET /health` and `POST /query`.
+
+### Prompt-injection safeguards
+
+- The system prompt tells the model to answer only from the provided context and to say so when the context doesn't cover the question.
+- Retrieved text is wrapped in `<context>` tags, and the prompt states that this content is data, not instructions.
+- A regex heuristic flags obvious override attempts (for example "ignore all previous instructions") and sets `flagged_for_review` in the response. This is a logging aid and is easy to bypass by rewording. The structural defenses above are the real protection.
+
+### Citations
+
+The `sources` field of the response is built directly from the metadata of the retrieved chunks, not from the model's text. It is the reliable record of which sections were used. The model's inline citations can differ from it.
 
 ## Project structure
 
@@ -54,9 +80,12 @@ osha-rag-assistant/
       auto-generated Swagger UI.
 - [x] **Evaluation harness** — retrieval hit-rate measured on a 20-question
       set spanning 13 subparts: 100%. See Evaluation section below.
-- [ ] Docker
+- [x] Docker
 
 ## Setup (local, step by step)
+
+Requires Python 3.11. Newer versions such as 3.13 fail to install the pinned
+`numpy==1.26.4`.
 
 ```bash
 # 1. Create and activate a virtual environment
@@ -70,59 +99,95 @@ pip install -r requirements.txt
 cp .env.example .env
 # edit .env and paste your OPENAI_API_KEY
 
-# 4. Ingest the source documents (downloads 29 CFR 1910 from eCFR)
+# 4. Download and parse the regulations (downloads 29 CFR 1910 from eCFR)
 python -m src.ingest
 
-# 5. Build the vector store (embeds all chunks — costs roughly $0.02-0.05
-#    with text-embedding-3-small)
+# 5. Build the vector store (about 2.7k chunks; costs roughly $0.02-0.05)
 python -m src.embed_store
 
 # 6. Run the API
+
 uvicorn src.api:app --reload
-
-# 7. Test it (in a separate terminal, or via http://localhost:8000/docs)
-curl -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What are the machine guarding requirements?"}'
-
-# 8. Run the evaluation harness
-python -m eval.run_eval
 ```
 
-Docker setup will be added here once containerization is complete.
+Open `http://localhost:8000/docs` and try `POST /query`, or:
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What are the requirements for eye protection?"}'
+```
+
+The response contains `answer`, `sources` (section id, title, URL) and
+`flagged_for_review`.
+
+## Docker
+
+With the vector store already built (steps 1-5 above), the API runs in a
+container:
+
+```bash
+docker compose up --build
+```
+
+Then open `http://localhost:8000/docs`. The compose file mounts `./chroma_db`
+into the container and passes your `.env` as environment variables. The `.env`
+file itself is excluded from the image by `.dockerignore`.
+
+Not yet tested: building the vector store inside the container from a fresh
+clone, which should work as
+
+```bash
+docker compose run --rm osha-rag-api python -m src.ingest
+docker compose run --rm osha-rag-api python -m src.embed_store
+```
 
 ## Evaluation
 
-Retrieval quality was measured with `eval/run_eval.py` against a 20-question
-test set (`eval/eval_qa.json`) spanning 13 different OSHA subparts — not
-just the topics covered during development, to avoid testing only on
-"easy" cases.
+`eval/run_eval.py` measures retrieval quality on 20 questions
+(`eval/eval_qa.json`) covering 13 different subparts. For each question it
+checks whether the expected section appears in the top 4 retrieved chunks.
 
-**Retrieval hit-rate: 100% (20/20)** — the correct section appeared in the
-top-4 retrieved chunks for every question. One initial miss (95%, 19/20)
-was traced to an imprecise expected-section label in the test set itself
-(confirmed by checking the real section titles in the data), not a
-retrieval failure — corrected after verification.
+**Retrieval hit-rate: 100% (20/20).**
 
-A separate manual spot-check runs full generation (not just retrieval) on
-a subset of 3 questions, to review answer quality and citation behavior
-without the added API cost of generating all 20.
+The first run scored 95% (19/20). The one miss was a question about general
+electrical safety, where I had labeled the expected section as `1910.303`
+("General") and the retriever returned `1910.301` ("Introduction") among other
+electrical sections. After checking the real section titles in the data, I
+corrected the label to `1910.301`. The retrieval itself was not changed.
 
-## Known gaps / honest next steps
+```bash
+python -m eval.run_eval
+```
 
-- `src/ingest.py`'s XML parsing worked against the live eCFR schema on first
-  real run (204 sections parsed) — but if `parse_sections()` ever returns 0
-  results after an eCFR schema change, inspect `data/raw/1910_raw.xml` and
-  adjust the tag names.
-- The AI's generated answer doesn't always explicitly cite every section it
-  retrieved — the `sources` field in the response is the reliable source of
-  truth (pulled directly from retrieved document metadata), not the AI's
-  inline prose citations.
-- The eval set (20 questions) is still a relatively small sample for
-  statistical confidence — expanding further would strengthen the
-  retrieval hit-rate as evidence.
-- The manual answer spot-check only reviews full generation on 3 of the
-  20 questions (API cost trade-off) — a more rigorous setup would use an
-  automated faithfulness check (e.g. LLM-as-judge) across the full set.
-- No Docker deployment yet.
+The same script also runs full answer generation on the first 3 questions for
+manual review.
+
+## Tests
+
+```bash
+python -m pytest
+```
+
+`tests/test_api.py` has three integration tests (health check, response shape
+of `/query`, injection flag). They call the real pipeline, so they need a built
+`chroma_db/` and a valid OpenAI key, and they cost a few cents per run.
+
+## Known gaps
+
+- The evaluation set is small (20 questions). It checks whether the right
+  section is retrieved, not whether the generated answer is correct.
+- Generated answers are only spot-checked by hand on 3 questions. An automated
+  faithfulness check (for example LLM-as-judge) would be the next step.
+- The chunk size (500 tokens) and `k=4` are reasonable defaults and have not
+  been tuned against the evaluation.
+- `GET /health` only confirms the server process is running. It does not check
+  the vector store or the OpenAI connection.
+- `requirements.txt` pins direct dependencies only. Transitive dependencies
+  can still shift between installs.
+- `ingest.py` depends on the eCFR XML tag structure (`DIV6` = subpart,
+  `DIV8` = section). If parsing returns 0 sections after a schema change,
+  inspect `data/raw/1910_raw.xml` and adjust the tag names.
+- Chroma prints harmless telemetry warnings (`Failed to send telemetry event`).
+- Single-turn only: no conversation memory.
 
